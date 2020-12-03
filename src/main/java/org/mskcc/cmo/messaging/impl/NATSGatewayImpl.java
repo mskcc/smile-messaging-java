@@ -1,28 +1,40 @@
 package org.mskcc.cmo.messaging.impl;
 
-import com.google.gson.Gson;
-import io.nats.streaming.Message;
-import io.nats.streaming.MessageHandler;
-import io.nats.streaming.StreamingConnection;
-import io.nats.streaming.Subscription;
-import io.nats.streaming.SubscriptionOptions;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+
 import org.mskcc.cmo.messaging.Gateway;
 import org.mskcc.cmo.messaging.MessageConsumer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.google.gson.Gson;
+
+import io.nats.streaming.Options;
+import io.nats.streaming.Message;
+import io.nats.streaming.Subscription;
+import io.nats.streaming.NatsStreaming;
+import io.nats.streaming.MessageHandler;
+import io.nats.streaming.StreamingConnection;
+import io.nats.streaming.SubscriptionOptions;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+
 @Component
 public class NATSGatewayImpl implements Gateway {
 
-    @Value("${nats.flush_duration:5}")
-    private Integer natsFlushDuration;
+    @Value("${nats.clusterid}")
+	private String clusterID;
 
-    @Value("${nats.clientid}")
-    private String clientID;
+	@Value("${nats.clientid}")
+	private String clientID;
 
     @Autowired
     private StreamingConnection stanConnection;
@@ -30,43 +42,107 @@ public class NATSGatewayImpl implements Gateway {
     private Gson gson;
     private Map<String, Subscription> subscribers;
 
-    public NATSGatewayImpl() {
-        this.gson = new Gson();
-        this.subscribers = new HashMap<>();
+    private static volatile boolean shutdownInitiated;
+    private static final ExecutorService exec = Executors.newSingleThreadExecutor();
+    private static final CountDownLatch publishingShutdownLatch = new CountDownLatch(1);
+    private static final BlockingQueue<PublishingQueueTask> publishingQueue = new LinkedBlockingQueue<PublishingQueueTask>();
+
+    private class PublishingQueueTask {
+        String topic;
+        Object message;
+
+        PublishingQueueTask(String topic, Object message) {
+            this.topic = topic;
+            this.message = message;
+        }
     }
 
-    @Override
-    public void publish(String topic, Object message) throws Exception {
-        if (stanConnection == null) {
-            return;
-        }
-        String msg = gson.toJson(message);
-        stanConnection.publish(topic, msg.getBytes(StandardCharsets.UTF_8));
-    }
+    private class NATSPublisher implements Runnable {
 
-    @Override
-    public void subscribe(String topic, Class messageClass, MessageConsumer consumer) throws Exception {
-        if (stanConnection == null) {
-            return;
+        StreamingConnection sc;
+        boolean interrupted = false;
+
+        NATSPublisher() throws Exception {
+            Options opts = new Options.Builder().natsConn(stanConnection.getNatsConnection()).build();
+            this.sc = NatsStreaming.connect(clusterID, clientID + "-publisher", opts);
         }
-        if (!subscribers.containsKey(topic)) {
-            Subscription sub = stanConnection.subscribe(topic, new MessageHandler() {
-                @Override
-                public void onMessage(Message m) {
-                    String json = new String(m.getData(), StandardCharsets.UTF_8);
-                    Object message = gson.fromJson(json, messageClass);
-                    consumer.onMessage(message);
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    PublishingQueueTask task = publishingQueue.poll(100, TimeUnit.MILLISECONDS);
+                    if (task != null) {
+                        String msg = gson.toJson(task.message);
+                        sc.publish(task.topic, msg.getBytes(StandardCharsets.UTF_8));
+                    }
+                    if (interrupted && publishingQueue.isEmpty()) {
+                        break;
+                    }
                 }
-            }, new SubscriptionOptions.Builder().durableName(topic + "_" + clientID).build());
+                catch (InterruptedException e) {
+                    interrupted = true;
+                }
+                catch (Exception e) {
+                    // TBD requeue?
+                    System.err.printf("Error during publishing: %s\n", e.getMessage());
+                }
+            }
+            try {
+                sc.close();
+                publishingShutdownLatch.countDown();
+            }
+            catch (Exception e) {
+                System.err.printf("Error closing streaming connection: %s\n", e.getMessage());
+            }
+        }
+    }
+
+	public NATSGatewayImpl() {
+		this.gson = new Gson();
+		this.subscribers = new HashMap<>();
+	}
+
+    @Override
+    public void initialize() throws Exception {
+        if (stanConnection == null) {
+            throw new IllegalStateException("Invalid NATS Streaming connection");
+        }
+        exec.execute(new NATSPublisher());
+    }
+
+	@Override
+	public void publish(String topic, Object message) throws Exception {
+        if (!shutdownInitiated) {
+            PublishingQueueTask task = new PublishingQueueTask(topic, message);
+            publishingQueue.put(task);
+        }
+        else {
+            System.err.printf("Shutdown initiated, not accepting publish request: %s\n", message);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore publish requests");
+        }
+    }
+
+	@Override
+	public void subscribe(String topic, Class messageClass, MessageConsumer consumer) throws Exception {
+		if (!subscribers.containsKey(topic)) {
+			Subscription sub = stanConnection.subscribe(topic, new MessageHandler() {
+				@Override
+				public void onMessage(Message m) {
+					String json = new String(m.getData(), StandardCharsets.UTF_8);
+					Object message = gson.fromJson(json, messageClass);
+					consumer.onMessage(message);
+				}
+			}, new SubscriptionOptions.Builder().durableName(topic + "_" + clientID).build());
             subscribers.put(topic, sub);
         }
     }
 
-    @Override
-    public void shutdown() throws Exception {
-        if (stanConnection != null) {
-            stanConnection.close();
-        }
-    }
-
+	@Override
+	public void shutdown() throws Exception {
+        exec.shutdownNow();
+        shutdownInitiated = true;
+        publishingShutdownLatch.await();
+        stanConnection.close();
+	}
 }
