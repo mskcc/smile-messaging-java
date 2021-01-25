@@ -140,7 +140,8 @@ public class NATSGatewayImpl implements Gateway {
                     Object message = null;
                     try {
                         String json = new String(msg.getData(), StandardCharsets.UTF_8);
-                        message = gson.fromJson(json, messageClass);
+                        String trimmed_json = json.replaceAll("^\"|\"$", "").replaceAll("\\\\", "");
+                        message = gson.fromJson(trimmed_json, messageClass);
                     } catch (Exception e) {
                         System.err.printf("Error deserializing NATS message: %s\n", msg);
                         System.err.printf("Exception: %s\n", e.getMessage());
