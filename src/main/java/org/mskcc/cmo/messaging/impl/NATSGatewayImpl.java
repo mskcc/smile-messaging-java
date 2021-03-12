@@ -97,7 +97,7 @@ public class NATSGatewayImpl implements Gateway {
                             LOG.debug("Message contents: " + msg);
                         }
                     }
-                    if (interrupted && publishingQueue.isEmpty()) {
+                    if ((interrupted || shutdownInitiated) && publishingQueue.isEmpty()) {
                         break;
                     }
                 } catch (InterruptedException e) {
