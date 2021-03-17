@@ -13,22 +13,39 @@ import org.springframework.stereotype.Component;
 @Component
 public class NATSPublishingFileUtil implements FileUtil {
     @Value("${metadb.publishing_failures_filepath}")
-    private String filePath;
+    private String publishingFailuresFilepath;
 
-    public boolean exists() {
-        File f = new File(filePath);
-        return f.exists();
-    }
+    private static final String PUB_FAILURES_FILE_HEADER = "DATE\tTOPIC\tMESSAGE\n";
 
     @Override
     public void savePublishFailureMessage(String topic, String message) throws IOException {
-        if (!exists()) {
-            File f = new File(filePath);
+        BufferedWriter fileWriter = getOrCreateFileWriterWithHeader(publishingFailuresFilepath,
+                PUB_FAILURES_FILE_HEADER);
+        fileWriter.write(generatePublishFailureRecord(topic, message));
+        fileWriter.close();
+    }
+
+    @Override
+    public void writeToFile(String filepath, String header, String value)
+            throws IOException {
+        BufferedWriter fileWriter = getOrCreateFileWriterWithHeader(filepath, header);
+        fileWriter.write(value);
+        fileWriter.close();
+    }
+
+    private BufferedWriter getOrCreateFileWriterWithHeader(String filepath, String header)
+            throws IOException {
+        File f = new File(filepath);
+        Boolean fileCreated = Boolean.FALSE;
+        if (!f.exists()) {
             f.createNewFile();
+            fileCreated = Boolean.TRUE;
         }
-        BufferedWriter publishFailureFile = new BufferedWriter(new FileWriter(filePath, true));
-        publishFailureFile.write(generatePublishFailureRecord(topic, message));
-        publishFailureFile.close();
+        BufferedWriter fileWriter = new BufferedWriter(new FileWriter(f, true));
+        if (fileCreated) {
+            fileWriter.write(header);
+        }
+        return fileWriter;
     }
 
     /**
