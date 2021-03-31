@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,6 +57,14 @@ public class NATSGatewayImpl implements Gateway {
 
     @Autowired
     FileUtil fileUtil;
+    
+    private File pubFailuresFile;
+
+    @Autowired
+    private void initPubFailuresFile() throws IOException {
+        this.pubFailuresFile = fileUtil.getOrCreateFileWithHeader(
+                metadbPubFailuresFilepath, PUB_FAILURES_FILE_HEADER);
+    }
 
     @Autowired SSLUtils sslUtils;
 
@@ -103,17 +112,19 @@ public class NATSGatewayImpl implements Gateway {
                         String msg = mapper.writeValueAsString(task.message);
                         try {
                             sc.publish(task.topic, msg.getBytes(StandardCharsets.UTF_8));
-                        } catch (Exception e) {
+                        } catch (IOException | InterruptedException | TimeoutException e) {
                             try {
-                                File pubFailuresFile = fileUtil.getOrCreateFileWithHeader(
-                                        metadbPubFailuresFilepath, PUB_FAILURES_FILE_HEADER);
                                 fileUtil.writeToFile(pubFailuresFile,
                                         generatePublishFailureRecord(task.topic, msg));
-                            } catch (IOException exception) {
-                                exception.printStackTrace();
+                            } catch (IOException ex) {
+                                LOG.error("Error during attempt to log publishing failure to file: " 
+                                        + metadbPubFailuresFilepath, e);
                             }
-                            LOG.error("Error encountered during attempt to publish on topic: " + task.topic);
-                            LOG.debug("Message contents: " + msg);
+                            if (e instanceof InterruptedException) {
+                                interrupted = true;
+                            } else {
+                                LOG.error("Error during attempt to publish on topic: " + task.topic, e);
+                            }
                         }
                     }
                     if ((interrupted || shutdownInitiated) && publishingQueue.isEmpty()) {
