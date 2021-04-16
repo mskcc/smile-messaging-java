@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
+import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
@@ -135,7 +136,7 @@ public class JSGatewayImpl implements Gateway {
             throw new IllegalStateException("Gateway connection has not been established");
         }
         exec.shutdownNow();
-        shutdownInitiated = true;
+        shutdownInitiated = Boolean.TRUE;
         publishingShutdownLatch.await();
         natsConnection.close();
     }
@@ -214,14 +215,8 @@ public class JSGatewayImpl implements Gateway {
                             }
                         } catch (Exception e) {
                             writeToPublishingLoggerFile(task.subject, msg);
-                            if (e instanceof InterruptedException) {
-                                interrupted = Boolean.TRUE;
-                            } else {
-                                LOG.error("Error during attempt to publish on topic: " + task.subject, e);
-                            }
-                        }
-                        if ((interrupted || shutdownInitiated) && publishingQueue.isEmpty()) {
-                            break;
+                            interrupted = Boolean.TRUE;
+                            LOG.error("Error during attempt to publish on topic: " + task.subject, e);
                         }
                     } else if (task != null && task.payload == null) {
                         writeToPublishingLoggerFile(task.subject, "message is null");
@@ -230,6 +225,9 @@ public class JSGatewayImpl implements Gateway {
                     interrupted = Boolean.TRUE;
                 } catch (JsonProcessingException ex) {
                     LOG.error("Error parsing JSON from message", ex);
+                }
+                if ((interrupted || shutdownInitiated) && publishingQueue.isEmpty()) {
+                    break;
                 }
             }
             try {
