@@ -103,7 +103,7 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public void publish(String stream, String subject, Object message) throws Exception {
+    public void publish(String subject, Object message) throws Exception {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
@@ -116,7 +116,7 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public void subscribe(String stream, String subject, Class messageClass,
+    public void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
