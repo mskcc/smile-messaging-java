@@ -14,6 +14,6 @@ TLS connection properties:
 - `nats.store_password`
 
 General NATS/STAN properties:
-- `nats.clientid`
-- `nats.clusterid`
+- `nats.consumer_name`
+- `nats.consumer_password`
 - `nats.url` : nats://\<ID>:\<PASSWORD>@\<HOST>:4222
