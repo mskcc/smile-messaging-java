@@ -50,10 +50,10 @@ public class JSGatewayImpl implements Gateway {
     @Value("${nats.url}")
     public String natsUrl;
 
-    @Value("${nats.consumername}")
+    @Value("${nats.consumer_name}")
     public String consumerName;
 
-    @Value("${nats.consumerpassword}")
+    @Value("${nats.consumer_password}")
     public String consumerPassword;
 
     private Connection natsConnection;
