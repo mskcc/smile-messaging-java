@@ -8,9 +8,9 @@ public interface Gateway {
 
     boolean isConnected();
 
-    void publish(String stream, String subject, Object message) throws Exception;
+    void publish(String subject, Object message) throws Exception;
 
-    void subscribe(String stream, String subject, Class messageClass,
+    void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception;
 
     void shutdown() throws Exception;
