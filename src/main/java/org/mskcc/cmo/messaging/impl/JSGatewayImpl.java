@@ -216,7 +216,12 @@ public class JSGatewayImpl implements Gateway {
                         } catch (Exception e) {
                             writeToPublishingLoggerFile(task.subject, msg);
                             interrupted = Boolean.TRUE;
-                            LOG.error("Error during attempt to publish on topic: " + task.subject, e);
+                            if (e instanceof IOException
+                                    && e.getLocalizedMessage().contains("InterruptedException")) {
+                                LOG.info("Interruption caught, exiting...");
+                            } else {
+                                LOG.error("Error during attempt to publish on topic: " + task.subject, e);
+                            }
                         }
                     } else if (task != null && task.payload == null) {
                         writeToPublishingLoggerFile(task.subject, "message is null");
