@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
-import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
@@ -18,7 +17,6 @@ import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
 import io.nats.client.api.ReplayPolicy;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
