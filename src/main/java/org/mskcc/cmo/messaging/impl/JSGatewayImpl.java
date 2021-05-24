@@ -5,14 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
-import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.Options.Builder;
+import io.nats.client.PushSubscribeOptions;
+import io.nats.client.api.AckPolicy;
+import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
+import io.nats.client.api.ReplayPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -124,8 +128,17 @@ public class JSGatewayImpl implements Gateway {
         }
         if (!subscribers.containsKey(subject)) {
             Dispatcher dispatcher = natsConnection.createDispatcher();
+            ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
+                    .durable(consumerName)
+                    .deliverPolicy(DeliverPolicy.New)
+                    .ackPolicy(AckPolicy.All)
+                    .replayPolicy(ReplayPolicy.Instant)
+                    .build();
+            PushSubscribeOptions options = PushSubscribeOptions.builder()
+                    .configuration(consumerConfig)
+                    .build();
             JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
-                msg -> onMessage(msg, messageClass, messageConsumer), false);
+                msg -> onMessage(msg, messageClass, messageConsumer), true, options);
             subscribers.put(subject, sub);
         }
     }
