@@ -60,6 +60,9 @@ public class JSGatewayImpl implements Gateway {
 
     @Value("${nats.consumer_password}")
     public String consumerPassword;
+    
+    @Value("${nats.filter_subject:METADB.*}")
+    public String filterSubject;
 
     private Connection natsConnection;
     private JetStream jsConnection;
@@ -130,6 +133,7 @@ public class JSGatewayImpl implements Gateway {
             Dispatcher dispatcher = natsConnection.createDispatcher();
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(consumerName)
+                    .filterSubject("METADB.*")
                     .deliverPolicy(DeliverPolicy.New)
                     .ackPolicy(AckPolicy.All)
                     .replayPolicy(ReplayPolicy.Instant)
