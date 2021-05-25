@@ -133,7 +133,7 @@ public class JSGatewayImpl implements Gateway {
             Dispatcher dispatcher = natsConnection.createDispatcher();
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(consumerName)
-                    .filterSubject("METADB.*")
+                    .filterSubject(filterSubject)
                     .deliverPolicy(DeliverPolicy.New)
                     .ackPolicy(AckPolicy.All)
                     .replayPolicy(ReplayPolicy.Instant)
