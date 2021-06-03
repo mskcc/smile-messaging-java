@@ -1,5 +1,9 @@
 package org.mskcc.cmo.messaging;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+
+>>>>>>> Introduced Request/Reply using nats connection
 import io.nats.client.Message;
 
 public interface Gateway {
@@ -17,11 +21,11 @@ public interface Gateway {
     void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception;
     
-    Message request(String subject, String message) throws Exception;
+    String request(String subject, String message) throws Exception;
     
-    void replySub(String subject, MessageConsumer consumer) throws Exception;
+    void replySub(String topic, MessageConsumer consumer) throws Exception;
     
-    void replyPublish(String subject, Object message) throws Exception;
+    void replyPublish(String topic, Object message) throws Exception;
 
     void shutdown() throws Exception;
 }
