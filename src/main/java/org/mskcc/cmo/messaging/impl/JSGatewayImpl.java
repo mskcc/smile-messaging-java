@@ -8,6 +8,7 @@ import io.nats.client.JetStream;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
+import io.nats.client.MessageHandler;
 import io.nats.client.NUID;
 import io.nats.client.Nats;
 import io.nats.client.Options;
@@ -19,20 +20,25 @@ import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
-import io.nats.client.api.ReplayPolicy;
+import io.nats.client.impl.NatsMessage;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.common.FileUtil;
@@ -66,6 +72,9 @@ public class JSGatewayImpl implements Gateway {
 
     @Value("${nats.filter_subject:METADB.*}")
     public String filterSubject;
+    
+    @Value("${nats.request_wait_time_in_seconds:10}")
+    public int requestWaitTime;
 
     private Connection natsConnection;
     private JetStream jsConnection;
@@ -150,15 +159,14 @@ public class JSGatewayImpl implements Gateway {
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(consumerName)
                     .filterSubject(filterSubject)
-                    .deliverPolicy(DeliverPolicy.New)
                     .ackPolicy(AckPolicy.All)
-                    .replayPolicy(ReplayPolicy.Instant)
+                    .deliverPolicy(DeliverPolicy.New)
                     .build();
             PushSubscribeOptions options = PushSubscribeOptions.builder()
                     .configuration(consumerConfig)
                     .build();
             JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
-                msg -> onMessage(msg, messageClass, messageConsumer), true, options);
+                msg -> onMessage(msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
     }
@@ -184,11 +192,7 @@ public class JSGatewayImpl implements Gateway {
         String payload = new String(msg.getData(), StandardCharsets.UTF_8);
         Object message = null;
 
-        try {
-            message = mapper.readValue(payload, messageClass);
-        } catch (JsonProcessingException ex) {
-            LOG.error("Error deserializing NATS message: " + payload, ex);
-        }
+        message = mapper.convertValue(payload, messageClass);
         if (message != null) {
             msg.ack();
             messageConsumer.onMessage(msg, message);
@@ -296,5 +300,51 @@ public class JSGatewayImpl implements Gateway {
             this.subject = subject;
             this.payload = payload;
         }
+    }
+
+    @Override
+    public String request(String subject, String message)
+            throws Exception {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
+        }
+        Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
+                .subject(subject)
+                .data(message, StandardCharsets.UTF_8)
+                .build());
+
+        Message reply = replyFuture.get(500, TimeUnit.SECONDS);
+        return mapper.convertValue(reply.getData(), String.class);
+    }
+    
+    @Override
+    public void replySub(String topic, MessageConsumer consumer) throws Exception {
+        Dispatcher d = natsConnection.createDispatcher(new io.nats.client.MessageHandler() {
+                @Override
+                public void onMessage(Message msg) throws InterruptedException {
+                    consumer.onMessage(msg, String.class);
+                }
+            });
+        d.subscribe(topic);
+    }
+
+//    @Override
+//    public void replySub(String topic, MessageConsumer consumer) throws Exception {
+//        Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
+//            @Override
+//            public void onMessage(Message msg) throws InterruptedException {
+//                consumer.onMessage(msg, String.class);
+//            }
+//        });
+//       d.subscribe(topic);
+//        
+//    }
+
+    @Override
+    public void replyPublish(String topic, Object data) throws Exception {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
+        }
+        natsConnection.publish(topic, mapper.convertValue(data, String.class).getBytes());        
     }
 }

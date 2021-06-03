@@ -1,5 +1,10 @@
 package org.mskcc.cmo.messaging;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+
+import io.nats.client.Message;
+
 public interface Gateway {
 
     void connect() throws Exception;
@@ -14,6 +19,12 @@ public interface Gateway {
 
     void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception;
+    
+    String request(String subject, String message) throws Exception;
+    
+    void replySub(String topic, MessageConsumer consumer) throws Exception;
+    
+    void replyPublish(String topic, Object message) throws Exception;
 
     void shutdown() throws Exception;
 }
