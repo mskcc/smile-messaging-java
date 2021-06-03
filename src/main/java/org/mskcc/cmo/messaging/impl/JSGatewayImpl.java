@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
+import io.nats.client.JetStreamManagement;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
@@ -61,7 +62,7 @@ public class JSGatewayImpl implements Gateway {
     @Value("${nats.consumer_password}")
     public String consumerPassword;
     
-    @Value("${nats.filter_subject:METADB.*}")
+    @Value("${nats.filter_subject}")
     public String filterSubject;
 
     private Connection natsConnection;
@@ -134,15 +135,16 @@ public class JSGatewayImpl implements Gateway {
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(consumerName)
                     .filterSubject(filterSubject)
-                    .deliverPolicy(DeliverPolicy.New)
                     .ackPolicy(AckPolicy.All)
-                    .replayPolicy(ReplayPolicy.Instant)
+                    .deliverPolicy(DeliverPolicy.New)
+                    
                     .build();
+            //System.out.println(consumerConfig.getFilterSubject());
             PushSubscribeOptions options = PushSubscribeOptions.builder()
                     .configuration(consumerConfig)
                     .build();
             JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
-                msg -> onMessage(msg, messageClass, messageConsumer), true, options);
+                msg -> onMessage(msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
     }
@@ -175,6 +177,9 @@ public class JSGatewayImpl implements Gateway {
         }
         if (message != null) {
             messageConsumer.onMessage(message);
+        }
+        if (msg.isJetStream()) {
+            msg.ack();
         }
     }
 
