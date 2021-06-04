@@ -9,6 +9,8 @@ public interface Gateway {
     boolean isConnected();
 
     void publish(String subject, Object message) throws Exception;
+    
+    void publish(String msgId, String subject, Object message) throws Exception;
 
     void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception;
