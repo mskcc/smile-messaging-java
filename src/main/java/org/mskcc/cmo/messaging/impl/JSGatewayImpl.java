@@ -8,10 +8,13 @@ import io.nats.client.JetStream;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
+import io.nats.client.NUID;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.Options.Builder;
+import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
+import io.nats.client.Subscription;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
@@ -60,7 +63,7 @@ public class JSGatewayImpl implements Gateway {
 
     @Value("${nats.consumer_password}")
     public String consumerPassword;
-    
+
     @Value("${nats.filter_subject:METADB.*}")
     public String filterSubject;
 
@@ -124,6 +127,19 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
+    public void publish(String msgId, String subject, Object message) throws Exception {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
+        }
+        if (!shutdownInitiated) {
+            publishingQueue.put(new PublishingQueueTask(msgId, subject, message));
+        } else {
+            LOG.error("Shutdown initiated, not accepting publish request: \n" + message);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore publish requests");
+        }
+    }
+
+    @Override
     public void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception {
         if (!isConnected()) {
@@ -174,7 +190,8 @@ public class JSGatewayImpl implements Gateway {
             LOG.error("Error deserializing NATS message: " + payload, ex);
         }
         if (message != null) {
-            messageConsumer.onMessage(message);
+            msg.ack();
+            messageConsumer.onMessage(msg, message);
         }
     }
 
@@ -226,7 +243,8 @@ public class JSGatewayImpl implements Gateway {
                     if (task != null && task.payload != null) {
                         String msg = mapper.writeValueAsString(task.payload);
                         try {
-                            PublishAck ack = jsConn.publish(task.subject, msg.getBytes());
+                            PublishAck ack = jsConn.publish(task.subject, msg.getBytes(),
+                                    PublishOptions.builder().messageId(task.msgId).build());
                             if (ack.getError() != null) {
                                 writeToPublishingLoggerFile(task.subject, msg);
                             }
@@ -263,10 +281,18 @@ public class JSGatewayImpl implements Gateway {
     }
 
     private class PublishingQueueTask {
+        String msgId;
         String subject;
         Object payload;
 
         public PublishingQueueTask(String subject, Object payload) {
+            this.msgId = NUID.nextGlobal();
+            this.subject = subject;
+            this.payload = payload;
+        }
+
+        public PublishingQueueTask(String msgId, String subject, Object payload) {
+            this.msgId = msgId;
             this.subject = subject;
             this.payload = payload;
         }

@@ -1,7 +1,9 @@
 package org.mskcc.cmo.messaging;
 
+import io.nats.client.Message;
+
 public interface MessageConsumer {
 
-    void onMessage(Object message);
+    void onMessage(Message msg, Object message);
 
 }
