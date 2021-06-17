@@ -21,7 +21,7 @@
     <jackson.version>2.11.2</jackson.version>
     <!-- metadb common centralized config properties -->
     <cmo_metadb_common.groupId>com.github.mskcc</cmo_metadb_common.groupId>
-    <cmo_metadb_common.version>156900ded3420b98ba9d4f45d01cad1aebe33941</cmo_metadb_common.version>
+    <cmo_metadb_common.version>4908b1cb7e2efb5792f131008996f8246c6db81f</cmo_metadb_common.version>
   </properties>
 
   <repositories>
