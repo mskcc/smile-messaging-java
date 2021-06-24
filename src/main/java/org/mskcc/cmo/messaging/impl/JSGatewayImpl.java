@@ -326,8 +326,8 @@ public class JSGatewayImpl implements Gateway {
 
             Message msg = sub.nextMessage(Duration.ZERO);
             
-            String reply_msg = mapper.writeValueAsString(message);
-            natsConnection.publish(msg.getReplyTo(), reply_msg.getBytes());
+            String replyMsg = mapper.writeValueAsString(message);
+            natsConnection.publish(msg.getReplyTo(), replyMsg.getBytes());
             
             natsConnection.flush(Duration.ofSeconds(5));
             
