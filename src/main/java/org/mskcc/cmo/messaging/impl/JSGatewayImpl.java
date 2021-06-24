@@ -24,6 +24,7 @@ import io.nats.client.api.ReplayPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -195,9 +196,6 @@ public class JSGatewayImpl implements Gateway {
             msg.ack();
             messageConsumer.onMessage(msg, message);
         }
-        if (msg.isJetStream()) {
-            msg.ack();
-        }
     }
 
     /**
@@ -300,6 +298,45 @@ public class JSGatewayImpl implements Gateway {
             this.msgId = msgId;
             this.subject = subject;
             this.payload = payload;
+        }
+    }
+
+    @Override
+    public String request(String subject, Object message) {
+        if (natsConnection == null) {
+            LOG.error("Error initializing NATS connection");
+        }
+        try {
+            String msg = mapper.writeValueAsString(message);
+            Message reply = natsConnection.request(subject, msg.getBytes(), Duration.ofSeconds(10));
+            if (reply == null) {
+                LOG.error("No reply received for a request using NATS connection");
+            } else {
+                return reply.getData().toString();
+            }
+        } catch (Exception ex) {
+            LOG.error("Error during attempt to send a request using NATS connection", ex);
+        }
+        return null;
+    }
+
+    @Override
+    public void reply(String subject, Object message) {
+        if (natsConnection == null) {
+            LOG.error("Error initializing NATS connection");
+        }
+        try {
+            Subscription sub = natsConnection.subscribe(subject);
+
+            Message msg = sub.nextMessage(Duration.ZERO);
+            
+            String reply_msg = mapper.writeValueAsString(message);
+            natsConnection.publish(msg.getReplyTo(), reply_msg.getBytes());
+            
+            natsConnection.flush(Duration.ofSeconds(5));
+            
+        } catch (Exception ex) {
+            LOG.error("Error during attempt to send a request using NATS connection", ex);
         }
     }
 }
