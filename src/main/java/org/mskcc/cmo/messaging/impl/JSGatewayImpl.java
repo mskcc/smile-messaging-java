@@ -326,12 +326,14 @@ public class JSGatewayImpl implements Gateway {
         }
         try {
             Dispatcher dispatcher = natsConnection.createDispatcher((msg) ->
-            onMessage(msg, String.class, new MessageConsumer() {
-                @Override
-                public void onMessage(Message msg, Object message) {
-                    String replyMsg = mapper.convertValue(message, String.class);
-                    natsConnection.publish(msg.getReplyTo(), replyMsg.getBytes());                    
-                }}));
+                onMessage(msg, String.class, new MessageConsumer() {
+                    @Override
+                    public void onMessage(Message msg, Object message) {
+                        String replyMsg = mapper.convertValue(message, String.class);
+                        natsConnection.publish(msg.getReplyTo(), replyMsg.getBytes());
+                    }
+                }
+            ));
            
             dispatcher.subscribe(subject);
             natsConnection.flush(Duration.ofSeconds(requestWaitTime));
