@@ -14,7 +14,6 @@ import io.nats.client.Options;
 import io.nats.client.Options.Builder;
 import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
-import io.nats.client.Subscription;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
@@ -66,6 +65,9 @@ public class JSGatewayImpl implements Gateway {
 
     @Value("${nats.filter_subject:METADB.*}")
     public String filterSubject;
+    
+    @Value("${nats.request_wait_time_in_seconds:10}")
+    public int requestWaitTime;
 
     private Connection natsConnection;
     private JetStream jsConnection;
@@ -298,17 +300,18 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public String request(String subject, Object message) {
-        if (natsConnection == null) {
-            LOG.error("Error initializing NATS connection");
+    public Message request(String subject, Object message) {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
         }
         try {
             String msg = mapper.writeValueAsString(message);
-            Message reply = natsConnection.request(subject, msg.getBytes(), Duration.ofSeconds(10));
+            Message reply = natsConnection.request(subject, msg.getBytes(),
+                    Duration.ofSeconds(requestWaitTime));
             if (reply == null) {
                 LOG.error("No reply received for a request using NATS connection");
             } else {
-                return reply.getData().toString();
+                return reply;
             }
         } catch (Exception ex) {
             LOG.error("Error during attempt to send a request using NATS connection", ex);
@@ -317,19 +320,21 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public void reply(String subject, Object message) {
-        if (natsConnection == null) {
-            LOG.error("Error initializing NATS connection");
+    public void reply(String subject, Object message, MessageConsumer messageConsumer) {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
         }
         try {
-            Subscription sub = natsConnection.subscribe(subject);
-
-            Message msg = sub.nextMessage(Duration.ZERO);
-            
-            String replyMsg = mapper.writeValueAsString(message);
-            natsConnection.publish(msg.getReplyTo(), replyMsg.getBytes());
-            
-            natsConnection.flush(Duration.ofSeconds(5));
+            Dispatcher dispatcher = natsConnection.createDispatcher((msg) ->
+            onMessage(msg, String.class, new MessageConsumer() {
+                @Override
+                public void onMessage(Message msg, Object message) {
+                    String replyMsg = mapper.convertValue(message, String.class);
+                    natsConnection.publish(msg.getReplyTo(), replyMsg.getBytes());                    
+                }}));
+           
+            dispatcher.subscribe(subject);
+            natsConnection.flush(Duration.ofSeconds(requestWaitTime));
             
         } catch (Exception ex) {
             LOG.error("Error during attempt to send a request using NATS connection", ex);
