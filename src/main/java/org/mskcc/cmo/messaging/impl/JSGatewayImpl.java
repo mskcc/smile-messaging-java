@@ -185,11 +185,7 @@ public class JSGatewayImpl implements Gateway {
         String payload = new String(msg.getData(), StandardCharsets.UTF_8);
         Object message = null;
 
-        try {
-            message = mapper.readValue(payload, messageClass);
-        } catch (JsonProcessingException ex) {
-            LOG.error("Error deserializing NATS message: " + payload, ex);
-        }
+        message = mapper.convertValue(payload, messageClass);
         if (message != null) {
             msg.ack();
             messageConsumer.onMessage(msg, message);
