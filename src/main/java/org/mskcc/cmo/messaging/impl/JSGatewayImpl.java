@@ -307,6 +307,8 @@ public class JSGatewayImpl implements Gateway {
                     Duration.ofSeconds(requestWaitTime));
             Subscription sub = natsConnection.subscribe(reply.getSubject());
             Message response = sub.nextMessage(Duration.ofMinutes(requestWaitTime));
+            System.out.println("Message response data: ");
+            System.out.println(new String(response.getData(), StandardCharsets.UTF_8));
             sub.unsubscribe();
             return response;
 //            if (reply == null) {
