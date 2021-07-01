@@ -33,6 +33,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.common.FileUtil;
@@ -297,20 +299,25 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public Message request(String subject, Object message) {
+    public Message request(String subject, String replyTo, Object message) {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
         try {
-            String msg = mapper.writeValueAsString(message);
-            Message response = natsConnection.request(subject, msg.getBytes(),
+            
+            
+            Map<String, Object> requestMessage = new HashMap<>();
+            requestMessage.put("reply-to-subject", replyTo);
+            requestMessage.put("data", message);
+            String msg = mapper.writeValueAsString(requestMessage);
+            
+            Message reply = natsConnection.request(subject, msg.getBytes(),
                     Duration.ofSeconds(requestWaitTime));
-//            Subscription sub = natsConnection.subscribe(reply.getSubject());
-//            Message response = sub.nextMessage(Duration.ofMinutes(requestWaitTime));
+            Subscription sub = natsConnection.subscribe(replyTo);
+            sub.unsubscribe(1);
             System.out.println("Message response data: ");
-            System.out.println(new String(response.getData(), StandardCharsets.UTF_8));
-//            sub.unsubscribe();
-            return response;
+            System.out.println(new String(reply.getData(), StandardCharsets.UTF_8));
+            return reply;
 //            if (reply == null) {
 //                LOG.error("No reply received for a request using NATS connection");
 //            } else {
@@ -328,10 +335,7 @@ public class JSGatewayImpl implements Gateway {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
         try {
-            Dispatcher dispatcher = natsConnection.createDispatcher((msg) ->
-                onMessage(msg, String.class, messageConsumer));
-            dispatcher.subscribe(subject);
-            natsConnection.flush(Duration.ofSeconds(requestWaitTime));
+            // not doing anything for now
         } catch (Exception ex) {
             LOG.error("Error during attempt to send a request using NATS connection", ex);
         }
