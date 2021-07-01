@@ -14,6 +14,7 @@ import io.nats.client.Options;
 import io.nats.client.Options.Builder;
 import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
+import io.nats.client.Subscription;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
@@ -304,11 +305,15 @@ public class JSGatewayImpl implements Gateway {
             String msg = mapper.writeValueAsString(message);
             Message reply = natsConnection.request(subject, msg.getBytes(),
                     Duration.ofSeconds(requestWaitTime));
-            if (reply == null) {
-                LOG.error("No reply received for a request using NATS connection");
-            } else {
-                return reply;
-            }
+            Subscription sub = natsConnection.subscribe(reply.getSubject());
+            Message response = sub.nextMessage(Duration.ofMinutes(requestWaitTime));
+            sub.unsubscribe();
+            return response;
+//            if (reply == null) {
+//                LOG.error("No reply received for a request using NATS connection");
+//            } else {
+//                return reply;
+//            }
         } catch (Exception ex) {
             LOG.error("Error during attempt to send a request using NATS connection", ex);
         }
