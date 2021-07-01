@@ -311,7 +311,7 @@ public class JSGatewayImpl implements Gateway {
             
             Message reply = natsConnection.request(subject, msg.getBytes(),
                     Duration.ofSeconds(requestWaitTime));
-            Subscription sub = natsConnection.subscribe("METADB.patient-samples-reply." + replyTo);
+            Subscription sub = natsConnection.subscribe("METADB.patient-samples-reply" + replyTo);
             sub.unsubscribe(1);
             System.out.println("Message response data: ");
             System.out.println(new String(reply.getData(), StandardCharsets.UTF_8));
