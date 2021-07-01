@@ -303,13 +303,13 @@ public class JSGatewayImpl implements Gateway {
         }
         try {
             String msg = mapper.writeValueAsString(message);
-            Message reply = natsConnection.request(subject, msg.getBytes(),
+            Message response = natsConnection.request(subject, msg.getBytes(),
                     Duration.ofSeconds(requestWaitTime));
-            Subscription sub = natsConnection.subscribe(reply.getSubject());
-            Message response = sub.nextMessage(Duration.ofMinutes(requestWaitTime));
+//            Subscription sub = natsConnection.subscribe(reply.getSubject());
+//            Message response = sub.nextMessage(Duration.ofMinutes(requestWaitTime));
             System.out.println("Message response data: ");
             System.out.println(new String(response.getData(), StandardCharsets.UTF_8));
-            sub.unsubscribe();
+//            sub.unsubscribe();
             return response;
 //            if (reply == null) {
 //                LOG.error("No reply received for a request using NATS connection");
@@ -323,7 +323,7 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public void reply(String subject, Object message, MessageConsumer messageConsumer) {
+    public void reply(String subject, MessageConsumer messageConsumer) {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
@@ -337,7 +337,6 @@ public class JSGatewayImpl implements Gateway {
                     }
                 }
             ));
-           
             dispatcher.subscribe(subject);
             natsConnection.flush(Duration.ofSeconds(requestWaitTime));
             
