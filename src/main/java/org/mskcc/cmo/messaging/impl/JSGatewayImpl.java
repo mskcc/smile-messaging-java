@@ -303,9 +303,7 @@ public class JSGatewayImpl implements Gateway {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
-        try {
-            
-            
+        try {            
             Map<String, Object> requestMessage = new HashMap<>();
             requestMessage.put("reply-to-subject", replyTo);
             requestMessage.put("data", message);
@@ -313,11 +311,11 @@ public class JSGatewayImpl implements Gateway {
             
             Message reply = natsConnection.request(subject, msg.getBytes(),
                     Duration.ofSeconds(requestWaitTime));
-            Subscription sub = natsConnection.subscribe(replyTo);
+            Subscription sub = natsConnection.subscribe("METADB.patient-samples-reply", replyTo);
             sub.unsubscribe(1);
             System.out.println("Message response data: ");
             System.out.println(new String(reply.getData(), StandardCharsets.UTF_8));
-            return reply;
+            return sub.nextMessage(Duration.ofMinutes(requestWaitTime));
 //            if (reply == null) {
 //                LOG.error("No reply received for a request using NATS connection");
 //            } else {
