@@ -15,30 +15,25 @@ import io.nats.client.Options;
 import io.nats.client.Options.Builder;
 import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
-import io.nats.client.Subscription;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
 import io.nats.client.impl.NatsMessage;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.common.FileUtil;
@@ -303,7 +298,7 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public String request(String subject, String message)
+    public Message request(String subject, String message)
             throws Exception {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
@@ -313,38 +308,29 @@ public class JSGatewayImpl implements Gateway {
                 .data(message, StandardCharsets.UTF_8)
                 .build());
 
-        Message reply = replyFuture.get(500, TimeUnit.SECONDS);
-        return mapper.convertValue(reply.getData(), String.class);
+        Message reply = replyFuture.get(requestWaitTime, TimeUnit.SECONDS);
+        return reply;
     }
     
     @Override
-    public void replySub(String topic, MessageConsumer consumer) throws Exception {
-        Dispatcher d = natsConnection.createDispatcher(new io.nats.client.MessageHandler() {
+    public void replySub(String subject, MessageConsumer consumer) throws Exception {
+        if (!isConnected()) {
+            throw new IllegalStateException("Gateway connection has not been established.");
+        }
+        Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
                 @Override
                 public void onMessage(Message msg) throws InterruptedException {
                     consumer.onMessage(msg, String.class);
                 }
             });
-        d.subscribe(topic);
+        d.subscribe(subject);
     }
 
-//    @Override
-//    public void replySub(String topic, MessageConsumer consumer) throws Exception {
-//        Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
-//            @Override
-//            public void onMessage(Message msg) throws InterruptedException {
-//                consumer.onMessage(msg, String.class);
-//            }
-//        });
-//       d.subscribe(topic);
-//        
-//    }
-
     @Override
-    public void replyPublish(String topic, Object data) throws Exception {
+    public void replyPublish(String subject, Object data) throws Exception {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
-        natsConnection.publish(topic, mapper.convertValue(data, String.class).getBytes());        
+        natsConnection.publish(subject, mapper.convertValue(data, String.class).getBytes());        
     }
 }
