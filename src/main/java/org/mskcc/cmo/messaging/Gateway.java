@@ -1,5 +1,7 @@
 package org.mskcc.cmo.messaging;
 
+import io.nats.client.Message;
+
 public interface Gateway {
 
     void connect() throws Exception;
@@ -14,6 +16,12 @@ public interface Gateway {
 
     void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception;
+    
+    Message request(String subject, String message) throws Exception;
+    
+    void replySub(String subject, MessageConsumer consumer) throws Exception;
+    
+    void replyPublish(String subject, Object message) throws Exception;
 
     void shutdown() throws Exception;
 }
