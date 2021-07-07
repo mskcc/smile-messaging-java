@@ -100,6 +100,7 @@ public class JSGatewayImpl implements Gateway {
     public void connect(String natsUrl) throws Exception {
         Builder builder = new Builder()
                 .server(natsUrl)
+                .oldRequestStyle()
                 .userInfo(consumerName, consumerPassword);
         if (tlsChannel) {
             builder.sslContext(sslUtils.createSSLContext());
