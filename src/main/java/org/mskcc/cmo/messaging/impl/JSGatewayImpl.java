@@ -19,6 +19,7 @@ import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
+import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.common.FileUtil;
@@ -67,7 +70,7 @@ public class JSGatewayImpl implements Gateway {
 
     @Value("${nats.filter_subject:METADB.*}")
     public String filterSubject;
-    
+
     @Value("${nats.request_wait_time_in_seconds:10}")
     public int requestWaitTime;
 
@@ -154,15 +157,12 @@ public class JSGatewayImpl implements Gateway {
             Dispatcher dispatcher = natsConnection.createDispatcher();
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(consumerName)
-                    .filterSubject(filterSubject)
-                    .ackPolicy(AckPolicy.All)
-                    .deliverPolicy(DeliverPolicy.New)
                     .build();
             PushSubscribeOptions options = PushSubscribeOptions.builder()
                     .configuration(consumerConfig)
                     .build();
             JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
-                msg -> onMessage(msg, messageClass, messageConsumer), false, options);
+                msg -> onMessage(subject, msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
     }
@@ -184,12 +184,20 @@ public class JSGatewayImpl implements Gateway {
      * @param messageClass
      * @param messageConsumer
      */
-    public void onMessage(Message msg, Class messageClass, MessageConsumer messageConsumer) {
+    public void onMessage(String subject, Message msg, Class messageClass, MessageConsumer messageConsumer) {
+        Boolean subjectMatches = Boolean.FALSE;
+        if (msg.hasHeaders()) {
+            List<String> hdrContents = msg.getHeaders().get("Nats-Msg-Subject");
+            if (hdrContents.size() == 1 && hdrContents.get(0).endsWith(subject)) {
+                subjectMatches = Boolean.TRUE;
+            }
+        }
+
         String payload = new String(msg.getData(), StandardCharsets.UTF_8);
         Object message = null;
 
         message = mapper.convertValue(payload, messageClass);
-        if (message != null) {
+        if (message != null && subjectMatches) {
             msg.ack();
             messageConsumer.onMessage(msg, message);
         }
@@ -241,15 +249,14 @@ public class JSGatewayImpl implements Gateway {
                 try {
                     PublishingQueueTask task = publishingQueue.poll(100, TimeUnit.MILLISECONDS);
                     if (task != null && task.payload != null) {
-                        String msg = mapper.writeValueAsString(task.payload);
                         try {
-                            PublishAck ack = jsConn.publish(task.subject, msg.getBytes(),
+                            PublishAck ack = jsConn.publish(task.getMessage(),
                                     PublishOptions.builder().messageId(task.msgId).build());
                             if (ack.getError() != null) {
-                                writeToPublishingLoggerFile(task.subject, msg);
+                                writeToPublishingLoggerFile(task.subject, task.getPayloadAsString());
                             }
                         } catch (Exception e) {
-                            writeToPublishingLoggerFile(task.subject, msg);
+                            writeToPublishingLoggerFile(task.subject, task.getPayloadAsString());
                             interrupted = Boolean.TRUE;
                             if (e instanceof IOException
                                     && e.getLocalizedMessage().contains("InterruptedException")) {
@@ -296,6 +303,19 @@ public class JSGatewayImpl implements Gateway {
             this.subject = subject;
             this.payload = payload;
         }
+
+        public Message getMessage() throws JsonProcessingException {
+            Headers headers = new Headers().add("Nats-Msg-Subject", subject);
+            return NatsMessage.builder()
+                    .subject(subject)
+                    .data(getPayloadAsString().getBytes())
+                    .headers(headers)
+                    .build();
+        }
+
+        public String getPayloadAsString() throws JsonProcessingException {
+            return mapper.writeValueAsString(payload);
+        }
     }
 
     @Override
@@ -304,27 +324,37 @@ public class JSGatewayImpl implements Gateway {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
-        Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
-                .subject(subject)
-                .data(message, StandardCharsets.UTF_8)
-                .build());
+        if (!shutdownInitiated) {
+            Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
+                    .subject(subject)
+                    .data(message, StandardCharsets.UTF_8)
+                    .build());
 
-        Message reply = replyFuture.get(requestWaitTime, TimeUnit.SECONDS);
-        return reply;
+            Message reply = replyFuture.get(requestWaitTime, TimeUnit.SECONDS);
+            return reply;
+        } else {
+            LOG.error("Shutdown initiated, not accepting publish request: \n" + message);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore requests");
+        }
     }
-    
+
     @Override
     public void replySub(String subject, MessageConsumer consumer) throws Exception {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
-        Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
-                @Override
-                public void onMessage(Message msg) throws InterruptedException {
-                    consumer.onMessage(msg, String.class);
-                }
-            });
-        d.subscribe(subject);
+        if (!shutdownInitiated) {
+            Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
+                    @Override
+                    public void onMessage(Message msg) throws InterruptedException {
+                        consumer.onMessage(msg, String.class);
+                    }
+                });
+            d.subscribe(subject);
+        } else {
+            LOG.error("Shutdown initiated, not handling replySub on topic: " + subject);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore replySub messages");
+        }
     }
 
     @Override
@@ -332,6 +362,11 @@ public class JSGatewayImpl implements Gateway {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established.");
         }
-        natsConnection.publish(subject, mapper.convertValue(data, String.class).getBytes());        
+        if (!shutdownInitiated) {
+            natsConnection.publish(subject, mapper.convertValue(data, String.class).getBytes());
+        } else {
+            LOG.error("Shutdown initiated, not handling replyPublish on topic: " + subject);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore publish requests");
+        }
     }
 }
