@@ -68,7 +68,7 @@ public class JSGatewayImpl implements Gateway {
     @Value("${nats.consumer_password}")
     public String consumerPassword;
 
-    @Value("${nats.filter_subject:METADB.*}")
+    @Value("${nats.filter_subject}")
     public String filterSubject;
 
     @Value("${nats.request_wait_time_in_seconds:10}")
@@ -161,8 +161,8 @@ public class JSGatewayImpl implements Gateway {
             PushSubscribeOptions options = PushSubscribeOptions.builder()
                     .configuration(consumerConfig)
                     .build();
-            JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
-                msg -> onMessage(subject, msg, messageClass, messageConsumer), false, options);
+            JetStreamSubscription sub = jsConnection.subscribe(filterSubject, dispatcher,
+                msg -> onMessage(msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
     }
@@ -184,11 +184,11 @@ public class JSGatewayImpl implements Gateway {
      * @param messageClass
      * @param messageConsumer
      */
-    public void onMessage(String subject, Message msg, Class messageClass, MessageConsumer messageConsumer) {
+    public void onMessage(Message msg, Class messageClass, MessageConsumer messageConsumer) {
         Boolean subjectMatches = Boolean.FALSE;
         if (msg.hasHeaders()) {
             List<String> hdrContents = msg.getHeaders().get("Nats-Msg-Subject");
-            if (hdrContents.size() == 1 && hdrContents.get(0).endsWith(subject)) {
+            if (hdrContents.size() == 1 && hdrContents.get(0).endsWith(msg.getSubject())) {
                 subjectMatches = Boolean.TRUE;
             }
         }
