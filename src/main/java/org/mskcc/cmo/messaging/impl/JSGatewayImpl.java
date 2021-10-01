@@ -15,9 +15,7 @@ import io.nats.client.Options;
 import io.nats.client.Options.Builder;
 import io.nats.client.PublishOptions;
 import io.nats.client.PushSubscribeOptions;
-import io.nats.client.api.AckPolicy;
 import io.nats.client.api.ConsumerConfiguration;
-import io.nats.client.api.DeliverPolicy;
 import io.nats.client.api.PublishAck;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
@@ -36,7 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.common.FileUtil;
@@ -162,7 +159,7 @@ public class JSGatewayImpl implements Gateway {
                     .configuration(consumerConfig)
                     .build();
             JetStreamSubscription sub = jsConnection.subscribe(filterSubject, dispatcher,
-                msg -> onMessage(msg, messageClass, messageConsumer), false, options);
+                msg -> onMessage(subject, msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
     }
@@ -180,23 +177,22 @@ public class JSGatewayImpl implements Gateway {
 
     /**
      * Configure basic message handler logic.
+     * @param subject
      * @param msg
      * @param messageClass
      * @param messageConsumer
      */
-    public void onMessage(Message msg, Class messageClass, MessageConsumer messageConsumer) {
+    public void onMessage(String subject, Message msg, Class messageClass, MessageConsumer messageConsumer) {
         Boolean subjectMatches = Boolean.FALSE;
         if (msg.hasHeaders()) {
             List<String> hdrContents = msg.getHeaders().get("Nats-Msg-Subject");
-            if (hdrContents.size() == 1 && hdrContents.get(0).endsWith(msg.getSubject())) {
+            if (hdrContents.size() == 1 && hdrContents.get(0).endsWith(subject)) {
                 subjectMatches = Boolean.TRUE;
             }
         }
 
         String payload = new String(msg.getData(), StandardCharsets.UTF_8);
-        Object message = null;
-
-        message = mapper.convertValue(payload, messageClass);
+        Object message = mapper.convertValue(payload, messageClass);
         if (message != null && subjectMatches) {
             msg.ack();
             messageConsumer.onMessage(msg, message);
