@@ -48,6 +48,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class JSGatewayImpl implements Gateway {
     private final Log LOG = LogFactory.getLog(JSGatewayImpl.class);
+    private final Integer RECONNECTION_ATTEMPTS = 10;
+    private final Integer RECONNECTION_TIME_SEC = 30;
     private final CountDownLatch publishingShutdownLatch = new CountDownLatch(1);
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, JetStreamSubscription> subscribers = new HashMap<>();
@@ -118,10 +120,28 @@ public class JSGatewayImpl implements Gateway {
                 && (natsConnection.getStatus().equals(Connection.Status.CONNECTED)));
     }
 
+    private void reconnect() throws Exception {
+        LOG.warn("Gateway connection has not been established or was lost - attemping to reconnect");
+        Integer currentAttempt = 1;
+        while (currentAttempt <= RECONNECTION_ATTEMPTS
+                && !isConnected()) {
+            LOG.info("Attempt #" + currentAttempt + "/" + RECONNECTION_ATTEMPTS
+                    + " to reestablish connection to NATS server...");
+            TimeUnit.SECONDS.sleep(RECONNECTION_TIME_SEC);
+            connect();
+        }
+        // if all attempts failed then throw illegal state exception
+        if (!isConnected()) {
+            throw new IllegalStateException("Failed to reestablish connection to NATS server");
+        } else {
+            LOG.info("Successfully reconnected to NATS server!");
+        }
+    }
+
     @Override
     public void publish(String subject, Object message) throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!shutdownInitiated) {
             publishingQueue.put(new PublishingQueueTask(subject, message));
@@ -134,7 +154,7 @@ public class JSGatewayImpl implements Gateway {
     @Override
     public void publish(String msgId, String subject, Object message) throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!shutdownInitiated) {
             publishingQueue.put(new PublishingQueueTask(msgId, subject, message));
@@ -148,7 +168,7 @@ public class JSGatewayImpl implements Gateway {
     public void subscribe(String subject, Class messageClass,
             MessageConsumer messageConsumer) throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!subscribers.containsKey(subject)) {
             Dispatcher dispatcher = natsConnection.createDispatcher();
@@ -318,7 +338,7 @@ public class JSGatewayImpl implements Gateway {
     public Message request(String subject, String message)
             throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!shutdownInitiated) {
             Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
@@ -337,7 +357,7 @@ public class JSGatewayImpl implements Gateway {
     @Override
     public void replySub(String subject, MessageConsumer consumer) throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!shutdownInitiated) {
             Dispatcher d = natsConnection.createDispatcher(new MessageHandler() {
@@ -356,7 +376,7 @@ public class JSGatewayImpl implements Gateway {
     @Override
     public void replyPublish(String subject, Object data) throws Exception {
         if (!isConnected()) {
-            throw new IllegalStateException("Gateway connection has not been established.");
+            reconnect();
         }
         if (!shutdownInitiated) {
             natsConnection.publish(subject, mapper.convertValue(data, String.class).getBytes());
