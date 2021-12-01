@@ -315,7 +315,7 @@ public class JSGatewayImpl implements Gateway {
         }
 
         public PublishingQueueTask(String msgId, String subject, Object payload) {
-            this.msgId = msgId;
+            this.msgId = msgId + "_" + subject;
             this.subject = subject;
             this.payload = payload;
         }
