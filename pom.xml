@@ -20,8 +20,8 @@
     <maven.compiler.version>1.8</maven.compiler.version>
     <jackson.version>2.11.2</jackson.version>
     <!-- metadb common centralized config properties -->
-    <cmo_metadb_common.group>com.github.mskcc</cmo_metadb_common.group>
-    <cmo_metadb_common.version>1.1.8.RELEASE</cmo_metadb_common.version>
+    <cmo_metadb_common.group>com.github.divyamadala30</cmo_metadb_common.group>
+    <cmo_metadb_common.version>3f4a21ce85b94ce218727aa3e66c3ce34da49413</cmo_metadb_common.version>
   </properties>
 
   <repositories>
