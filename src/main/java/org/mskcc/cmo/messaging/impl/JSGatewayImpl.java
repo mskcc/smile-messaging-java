@@ -178,7 +178,7 @@ public class JSGatewayImpl implements Gateway {
             PushSubscribeOptions options = PushSubscribeOptions.builder()
                     .configuration(consumerConfig)
                     .build();
-            JetStreamSubscription sub = jsConnection.subscribe(filterSubject, dispatcher,
+            JetStreamSubscription sub = jsConnection.subscribe(subject, dispatcher,
                 msg -> onMessage(subject, msg, messageClass, messageConsumer), false, options);
             subscribers.put(subject, sub);
         }
