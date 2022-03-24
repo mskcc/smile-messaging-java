@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.mskcc.cmo</groupId>
-  <artifactId>cmo-messaging-library</artifactId>
-  <name>CMO Messaging Library Master</name>
+  <artifactId>smile-messaging-java</artifactId>
+  <name>CMO SMILE Messaging Library</name>
   <version>0.0.1-SNAPSHOT</version>
   <description>master maven module</description>
   <packaging>jar</packaging>
@@ -19,9 +19,9 @@
     <java.version>1.8</java.version>
     <maven.compiler.version>1.8</maven.compiler.version>
     <jackson.version>2.11.2</jackson.version>
-    <!-- metadb common centralized config properties -->
-    <cmo_metadb_common.group>com.github.mskcc</cmo_metadb_common.group>
-    <cmo_metadb_common.version>1.2.2.RELEASE</cmo_metadb_common.version>
+    <!-- smile common centralized config properties -->
+    <smile_commons.group>com.github.mskcc</smile_commons.group>
+    <smile_commons.version>1.3.0.RELEASE</smile_commons.version>
   </properties>
 
   <repositories>
@@ -53,11 +53,11 @@
       <artifactId>nats-spring</artifactId>
       <version>0.4.0</version>
     </dependency>
-    <!-- cmo metadb common -->
+    <!-- smile commons -->
     <dependency>
-      <groupId>${cmo_metadb_common.group}</groupId>
-      <artifactId>cmo-metadb-common</artifactId>
-      <version>${cmo_metadb_common.version}</version>
+      <groupId>${smile_commons.group}</groupId>
+      <artifactId>smile-commons</artifactId>
+      <version>${smile_commons.version}</version>
     </dependency>
     <!-- jackson -->
     <dependency>
@@ -85,9 +85,9 @@
         <version>3.1.1</version>
         <dependencies>
           <dependency>
-            <groupId>${cmo_metadb_common.group}</groupId>
-            <artifactId>cmo-metadb-common</artifactId>
-            <version>${cmo_metadb_common.version}</version>
+            <groupId>${smile_commons.group}</groupId>
+            <artifactId>smile-commons</artifactId>
+            <version>${smile_commons.version}</version>
           </dependency>
         </dependencies>
         <configuration>

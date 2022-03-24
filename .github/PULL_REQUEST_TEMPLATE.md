@@ -34,8 +34,8 @@ Please follow these checklists to help prevent any unexpected issues from being 
 
 **Data checks:**
 Updates were made to the mocked incoming request data and/or mocked published request data:
-- [ ] [cmo-metadb test data](https://github.com/mskcc/cmo-metadb/tree/master/service/src/test/resources/data)
-- [ ] [cmo-metadb-common test data](https://github.com/mskcc/cmo-metadb-common/tree/master/src/test/resources/data)
+- [ ] [smile-server test data](https://github.com/mskcc/smile-server/tree/master/service/src/test/resources/data)
+- [ ] [smile-commons test data](https://github.com/mskcc/smile-commons/tree/master/src/test/resources/data)
 
 **Code checks:**
 - [ ] The JSON comparator code been updated to handle new changes.
@@ -47,8 +47,8 @@ If no unit tests were updated or added, then please explain why: [insert details
 
 - NATS [local, local docker, dev server, production]
 - Neo4j [local, local docker, dev server, production]
-- MetaDB [local, local docker, dev server, production]
-- Message publishing simulation [nats cli, docker nats cli, metadb publisher tool, other (describe below)]
+- SMILE Server [local, local docker, dev server, production]
+- Message publishing simulation [nats cli, docker nats cli, sample publisher tool, other (describe below)]
 
 Other: [insert details on how messages were published or simulated for testing]
 
