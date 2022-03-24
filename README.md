@@ -1,4 +1,4 @@
-# CMO Messaging Library
+# SMILE Messaging Library
 
 The messaging library used by Java clients to interface with CMO messaging backbone.
 

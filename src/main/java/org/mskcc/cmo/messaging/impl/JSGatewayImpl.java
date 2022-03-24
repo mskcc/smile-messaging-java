@@ -36,11 +36,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.mskcc.cmo.common.FileUtil;
-import org.mskcc.cmo.common.impl.FileUtilImpl;
 import org.mskcc.cmo.messaging.Gateway;
 import org.mskcc.cmo.messaging.MessageConsumer;
 import org.mskcc.cmo.messaging.utils.SSLUtils;
+import org.mskcc.smile.commons.FileUtil;
+import org.mskcc.smile.commons.impl.FileUtilImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -77,8 +77,8 @@ public class JSGatewayImpl implements Gateway {
     private JetStream jsConnection;
 
     // publishing logger file variables
-    @Value("${metadb.publishing_failures_filepath}")
-    private String metadbPubFailuresFilepath;
+    @Value("${smile.publishing_failures_filepath}")
+    private String smilePubFailuresFilepath;
 
     private final String PUB_FAILURES_FILE_HEADER = "DATE\tTOPIC\tMESSAGE\n";
     private FileUtil fileUtil = new FileUtilImpl();
@@ -106,8 +106,8 @@ public class JSGatewayImpl implements Gateway {
         }
         this.natsConnection = Nats.connect(builder.build());
         this.jsConnection = natsConnection.jetStream();
-        publishingLoggerFile = fileUtil.getOrCreateFileWithHeader(
-                metadbPubFailuresFilepath, PUB_FAILURES_FILE_HEADER);
+        publishingLoggerFile = fileUtil.getOrCreateFileWithHeader(smilePubFailuresFilepath,
+                PUB_FAILURES_FILE_HEADER);
         exec.execute(new NATSPublisher(natsConnection.getOptions()));
     }
 
