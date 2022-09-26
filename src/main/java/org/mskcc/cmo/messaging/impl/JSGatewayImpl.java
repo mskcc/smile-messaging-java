@@ -40,6 +40,7 @@ import org.mskcc.cmo.messaging.Gateway;
 import org.mskcc.cmo.messaging.MessageConsumer;
 import org.mskcc.cmo.messaging.utils.SSLUtils;
 import org.mskcc.smile.commons.FileUtil;
+import org.mskcc.smile.commons.OpenTelemetryUtils.TraceMetadata;
 import org.mskcc.smile.commons.impl.FileUtilImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,6 +136,19 @@ public class JSGatewayImpl implements Gateway {
             throw new IllegalStateException("Failed to reestablish connection to NATS server");
         } else {
             LOG.info("Successfully reconnected to NATS server!");
+        }
+    }
+
+    @Override
+    public void publishWithTrace(String subject, Object message, TraceMetadata tmd) throws Exception {
+        if (!isConnected()) {
+            reconnect();
+        }
+        if (!shutdownInitiated) {
+            publishingQueue.put(new PublishingQueueTask(subject, message, tmd));
+        } else {
+            LOG.error("Shutdown initiated, not accepting publish request: \n" + message);
+            throw new IllegalStateException("Shutdown initiated, not accepting anymore publish requests");
         }
     }
 
@@ -307,6 +321,14 @@ public class JSGatewayImpl implements Gateway {
         String msgId;
         String subject;
         Object payload;
+        TraceMetadata tmd;
+
+        public PublishingQueueTask(String subject, Object payload, TraceMetadata tmd) {
+            this.msgId = NUID.nextGlobal();
+            this.subject = subject;
+            this.payload = payload;
+            this.tmd = tmd;
+        }
 
         public PublishingQueueTask(String subject, Object payload) {
             this.msgId = NUID.nextGlobal();
@@ -322,6 +344,9 @@ public class JSGatewayImpl implements Gateway {
 
         public Message getMessage() throws JsonProcessingException {
             Headers headers = new Headers().add("Nats-Msg-Subject", subject);
+            if (tmd != null) {
+                headers.add(tmd.getHeaderKey(), tmd.getMetadata());
+            }
             return NatsMessage.builder()
                     .subject(subject)
                     .data(getPayloadAsString().getBytes())

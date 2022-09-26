@@ -4,7 +4,7 @@
   <groupId>org.mskcc.cmo</groupId>
   <artifactId>smile-messaging-java</artifactId>
   <name>CMO SMILE Messaging Library</name>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.1.1-SNAPSHOT</version>
   <description>master maven module</description>
   <packaging>jar</packaging>
   <parent>
@@ -21,7 +21,7 @@
     <jackson.version>2.11.2</jackson.version>
     <!-- smile common centralized config properties -->
     <smile_commons.group>com.github.mskcc</smile_commons.group>
-    <smile_commons.version>1.3.6.RELEASE</smile_commons.version>
+    <smile_commons.version>1.3.7.RELEASE</smile_commons.version>
   </properties>
 
   <repositories>
