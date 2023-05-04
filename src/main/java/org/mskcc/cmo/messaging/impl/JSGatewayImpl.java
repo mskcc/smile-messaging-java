@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.messaging.Gateway;
@@ -51,6 +52,7 @@ public class JSGatewayImpl implements Gateway {
     private final Log LOG = LogFactory.getLog(JSGatewayImpl.class);
     private final Integer RECONNECTION_ATTEMPTS = 10;
     private final Integer RECONNECTION_TIME_SEC = 30;
+    private final Integer REQREPLY_ATTEMPTS = 10;
     private final CountDownLatch publishingShutdownLatch = new CountDownLatch(1);
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, JetStreamSubscription> subscribers = new HashMap<>();
@@ -366,13 +368,21 @@ public class JSGatewayImpl implements Gateway {
             reconnect();
         }
         if (!shutdownInitiated) {
-            Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
-                    .subject(subject)
-                    .data(message, StandardCharsets.UTF_8)
-                    .build());
-
-            Message reply = replyFuture.get(requestWaitTime, TimeUnit.SECONDS);
-            return reply;
+            Integer currentAttempt = 1;
+            while (currentAttempt <= REQREPLY_ATTEMPTS) {
+                try {
+                    Future<Message> replyFuture = natsConnection.request(NatsMessage.builder()
+                            .subject(subject)
+                            .data(message, StandardCharsets.UTF_8)
+                            .build());
+                    Message reply = replyFuture.get(requestWaitTime, TimeUnit.SECONDS);
+                    return reply;
+                } catch (TimeoutException e) {
+                    currentAttempt++;
+                }
+            }
+            // throw timeout exception if exceeded num attempts allowed for req-reply
+            throw new TimeoutException("Exceeded allowed number of attempts for request-reply");
         } else {
             LOG.error("Shutdown initiated, not accepting publish request: \n" + message);
             throw new IllegalStateException("Shutdown initiated, not accepting anymore requests");
