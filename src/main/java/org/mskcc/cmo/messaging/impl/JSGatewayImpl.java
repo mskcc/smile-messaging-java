@@ -41,7 +41,6 @@ import org.mskcc.cmo.messaging.Gateway;
 import org.mskcc.cmo.messaging.MessageConsumer;
 import org.mskcc.cmo.messaging.utils.SSLUtils;
 import org.mskcc.smile.commons.FileUtil;
-import org.mskcc.smile.commons.OpenTelemetryUtils.TraceMetadata;
 import org.mskcc.smile.commons.impl.FileUtilImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -142,12 +141,13 @@ public class JSGatewayImpl implements Gateway {
     }
 
     @Override
-    public void publishWithTrace(String subject, Object message, TraceMetadata tmd) throws Exception {
+    public void publishWithTracePropagation(String subject, Object message, Map<String, String> traceMetadata)
+        throws Exception {
         if (!isConnected()) {
             reconnect();
         }
         if (!shutdownInitiated) {
-            publishingQueue.put(new PublishingQueueTask(subject, message, tmd));
+            publishingQueue.put(new PublishingQueueTask(subject, message, traceMetadata));
         } else {
             LOG.error("Shutdown initiated, not accepting publish request: \n" + message);
             throw new IllegalStateException("Shutdown initiated, not accepting anymore publish requests");
@@ -323,13 +323,13 @@ public class JSGatewayImpl implements Gateway {
         String msgId;
         String subject;
         Object payload;
-        TraceMetadata tmd;
+        Map<String, String> traceMetadata;
 
-        public PublishingQueueTask(String subject, Object payload, TraceMetadata tmd) {
+        public PublishingQueueTask(String subject, Object payload, Map<String, String> traceMetadata) {
             this.msgId = NUID.nextGlobal();
             this.subject = subject;
             this.payload = payload;
-            this.tmd = tmd;
+            this.traceMetadata = traceMetadata;
         }
 
         public PublishingQueueTask(String subject, Object payload) {
@@ -346,8 +346,10 @@ public class JSGatewayImpl implements Gateway {
 
         public Message getMessage() throws JsonProcessingException {
             Headers headers = new Headers().add("Nats-Msg-Subject", subject);
-            if (tmd != null) {
-                headers.add(tmd.getHeaderKey(), tmd.getMetadata());
+            if (traceMetadata != null) {
+                for (Map.Entry<String, String> entry : traceMetadata.entrySet()) {
+                    headers.add(entry.getKey(), entry.getValue());
+                }
             }
             return NatsMessage.builder()
                     .subject(subject)
