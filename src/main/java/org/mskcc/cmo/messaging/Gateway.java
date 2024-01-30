@@ -1,7 +1,7 @@
 package org.mskcc.cmo.messaging;
 
 import io.nats.client.Message;
-import org.mskcc.smile.commons.OpenTelemetryUtils.TraceMetadata;
+import java.util.Map;
 
 public interface Gateway {
 
@@ -11,7 +11,8 @@ public interface Gateway {
 
     boolean isConnected();
 
-    void publishWithTrace(String subject, Object message, TraceMetadata tmd) throws Exception;
+    void publishWithTracePropagation(String subject, Object message, Map<String, String> traceMetadata)
+        throws Exception;
 
     void publish(String subject, Object message) throws Exception;
 
