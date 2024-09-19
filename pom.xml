@@ -16,12 +16,13 @@
   </parent>
 
   <properties>
-    <java.version>19</java.version>
-    <maven.compiler.version>19</maven.compiler.version>
-    <jackson.version>2.14.1</jackson.version>
+    <java.version>21</java.version>
+    <maven.compiler.version>3.11.0</maven.compiler.version>
+    <jackson.version>2.17.2</jackson.version>
+    <spring.version>6.1.12</spring.version>
     <!-- smile common centralized config properties -->
     <smile_commons.group>com.github.mskcc</smile_commons.group>
-    <smile_commons.version>java-v19-beta-8</smile_commons.version>
+    <smile_commons.version>java-v21-beta-2</smile_commons.version>
   </properties>
 
   <repositories>
@@ -72,10 +73,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.13.0</version>
+        <version>${maven.compiler.version}</version>
         <configuration>
-          <source>${maven.compiler.version}</source>
-          <target>${maven.compiler.version}</target>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
           <compilerArgument>-Xlint:deprecation</compilerArgument>
         </configuration>
       </plugin>
