@@ -19,11 +19,8 @@ import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.PublishAck;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +37,6 @@ import org.apache.commons.logging.LogFactory;
 import org.mskcc.cmo.messaging.Gateway;
 import org.mskcc.cmo.messaging.MessageConsumer;
 import org.mskcc.cmo.messaging.utils.SSLUtils;
-import org.mskcc.smile.commons.FileUtil;
-import org.mskcc.smile.commons.impl.FileUtilImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -78,14 +73,6 @@ public class JSGatewayImpl implements Gateway {
     private Connection natsConnection;
     private JetStream jsConnection;
 
-    // publishing logger file variables
-    @Value("${smile.publishing_failures_filepath}")
-    private String smilePubFailuresFilepath;
-
-    private final String PUB_FAILURES_FILE_HEADER = "DATE\tTOPIC\tMESSAGE\n";
-    private FileUtil fileUtil = new FileUtilImpl();
-    private File publishingLoggerFile;
-
     @Value("${nats.tls_channel:false}")
     private boolean tlsChannel;
 
@@ -108,8 +95,6 @@ public class JSGatewayImpl implements Gateway {
         }
         this.natsConnection = Nats.connect(builder.build());
         this.jsConnection = natsConnection.jetStream();
-        publishingLoggerFile = fileUtil.getOrCreateFileWithHeader(smilePubFailuresFilepath,
-                PUB_FAILURES_FILE_HEADER);
         exec.execute(new NATSPublisher(natsConnection.getOptions()));
     }
 
@@ -235,29 +220,6 @@ public class JSGatewayImpl implements Gateway {
         }
     }
 
-    /**
-     * Writes to publishing logger file.
-     * @param subject
-     * @param message
-     */
-    public void writeToPublishingLoggerFile(String subject, String message) {
-        String currentDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
-        StringBuilder builder = new StringBuilder();
-        builder.append(currentDate)
-                .append("\t")
-                .append(subject)
-                .append("\t")
-                .append(message)
-                .append("\n");
-
-        try {
-            fileUtil.writeToFile(publishingLoggerFile,
-                    builder.toString());
-        } catch (IOException ex) {
-            LOG.error("Error during attempt to log publishing task to logger file", ex);
-        }
-    }
-
     private class NATSPublisher implements Runnable {
         Connection natsConn;
         JetStream jsConn;
@@ -285,10 +247,9 @@ public class JSGatewayImpl implements Gateway {
                             PublishAck ack = jsConn.publish(task.getMessage(),
                                     PublishOptions.builder().messageId(task.msgId).build());
                             if (ack.getError() != null) {
-                                writeToPublishingLoggerFile(task.subject, task.getPayloadAsString());
+                                LOG.error(ack.getError());
                             }
                         } catch (Exception e) {
-                            writeToPublishingLoggerFile(task.subject, task.getPayloadAsString());
                             interrupted = Boolean.TRUE;
                             if (e instanceof IOException
                                     && e.getLocalizedMessage().contains("InterruptedException")) {
@@ -297,13 +258,9 @@ public class JSGatewayImpl implements Gateway {
                                 LOG.error("Error during attempt to publish on topic: " + task.subject, e);
                             }
                         }
-                    } else if (task != null && task.payload == null) {
-                        writeToPublishingLoggerFile(task.subject, "message is null");
                     }
                 } catch (InterruptedException ex) {
                     interrupted = Boolean.TRUE;
-                } catch (JsonProcessingException ex) {
-                    LOG.error("Error parsing JSON from message", ex);
                 }
                 if ((interrupted || shutdownInitiated) && publishingQueue.isEmpty()) {
                     break;
