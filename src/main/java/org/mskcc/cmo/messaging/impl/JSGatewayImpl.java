@@ -21,6 +21,7 @@ import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -281,24 +282,28 @@ public class JSGatewayImpl implements Gateway {
         String subject;
         Object payload;
         Map<String, String> traceMetadata;
+        boolean isBinary;
 
         public PublishingQueueTask(String subject, Object payload, Map<String, String> traceMetadata) {
             this.msgId = NUID.nextGlobal();
             this.subject = subject;
             this.payload = payload;
             this.traceMetadata = traceMetadata;
+            this.isBinary = payload instanceof byte[];
         }
 
         public PublishingQueueTask(String subject, Object payload) {
             this.msgId = NUID.nextGlobal();
             this.subject = subject;
             this.payload = payload;
+            this.isBinary = payload instanceof byte[];
         }
 
         public PublishingQueueTask(String msgId, String subject, Object payload) {
             this.msgId = msgId + "_" + subject;
             this.subject = subject;
             this.payload = payload;
+            this.isBinary = payload instanceof byte[];
         }
 
         public Message getMessage() throws JsonProcessingException {
@@ -308,14 +313,18 @@ public class JSGatewayImpl implements Gateway {
                     headers.add(entry.getKey(), entry.getValue());
                 }
             }
+            byte[] data = isBinary ? (byte[]) payload : getPayloadAsString().getBytes();
             return NatsMessage.builder()
                     .subject(subject)
-                    .data(getPayloadAsString().getBytes())
+                    .data(data)
                     .headers(headers)
                     .build();
         }
 
         public String getPayloadAsString() throws JsonProcessingException {
+            if (isBinary) {
+                return Base64.getEncoder().encodeToString((byte[]) payload);
+            }
             return mapper.writeValueAsString(payload);
         }
     }
