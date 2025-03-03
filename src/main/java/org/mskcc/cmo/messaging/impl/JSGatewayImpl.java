@@ -2,6 +2,7 @@ package org.mskcc.cmo.messaging.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.ByteString;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
@@ -21,7 +22,6 @@ import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsMessage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -323,7 +323,7 @@ public class JSGatewayImpl implements Gateway {
 
         public String getPayloadAsString() throws JsonProcessingException {
             if (isBinary) {
-                return Base64.getEncoder().encodeToString((byte[]) payload);
+                return ByteString.copyFrom((byte[]) payload).toStringUtf8();
             }
             return mapper.writeValueAsString(payload);
         }
