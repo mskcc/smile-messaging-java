@@ -322,9 +322,6 @@ public class JSGatewayImpl implements Gateway {
         }
 
         public String getPayloadAsString() throws JsonProcessingException {
-            if (isBinary) {
-                return ByteString.copyFrom((byte[]) payload).toStringUtf8();
-            }
             return mapper.writeValueAsString(payload);
         }
     }
