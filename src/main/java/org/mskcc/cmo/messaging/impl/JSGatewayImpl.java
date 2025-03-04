@@ -2,6 +2,7 @@ package org.mskcc.cmo.messaging.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.ByteString;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
@@ -281,24 +282,28 @@ public class JSGatewayImpl implements Gateway {
         String subject;
         Object payload;
         Map<String, String> traceMetadata;
+        boolean isBinary;
 
         public PublishingQueueTask(String subject, Object payload, Map<String, String> traceMetadata) {
             this.msgId = NUID.nextGlobal();
             this.subject = subject;
             this.payload = payload;
             this.traceMetadata = traceMetadata;
+            this.isBinary = payload instanceof byte[];
         }
 
         public PublishingQueueTask(String subject, Object payload) {
             this.msgId = NUID.nextGlobal();
             this.subject = subject;
             this.payload = payload;
+            this.isBinary = payload instanceof byte[];
         }
 
         public PublishingQueueTask(String msgId, String subject, Object payload) {
             this.msgId = msgId + "_" + subject;
             this.subject = subject;
             this.payload = payload;
+            this.isBinary = payload instanceof byte[];
         }
 
         public Message getMessage() throws JsonProcessingException {
@@ -308,9 +313,10 @@ public class JSGatewayImpl implements Gateway {
                     headers.add(entry.getKey(), entry.getValue());
                 }
             }
+            byte[] data = isBinary ? (byte[]) payload : getPayloadAsString().getBytes();
             return NatsMessage.builder()
                     .subject(subject)
-                    .data(getPayloadAsString().getBytes())
+                    .data(data)
                     .headers(headers)
                     .build();
         }
