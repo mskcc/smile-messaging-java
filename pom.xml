@@ -23,7 +23,7 @@
     <jackson.version>2.17.2</jackson.version>
     <!-- smile common centralized config properties -->
     <smile_commons.group>com.github.mskcc</smile_commons.group>
-    <smile_commons.version>2.1.1.RELEASE</smile_commons.version>
+    <smile_commons.version>2.1.2.RELEASE</smile_commons.version>
   </properties>
 
   <repositories>
