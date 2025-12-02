@@ -21,9 +21,6 @@
     <java.version>21</java.version>
     <maven.compiler.version>3.11.0</maven.compiler.version>
     <jackson.version>2.17.2</jackson.version>
-    <!-- smile common centralized config properties -->
-    <smile_commons.group>com.github.mskcc</smile_commons.group>
-    <smile_commons.version>2.1.1.RELEASE</smile_commons.version>
   </properties>
 
   <repositories>
@@ -32,13 +29,6 @@
       <url>https://jitpack.io</url>
     </repository>
   </repositories>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
-    </pluginRepository>
-  </pluginRepositories>
 
   <dependencies>
     <dependency>
@@ -60,7 +50,6 @@
       <artifactId>protobuf-java</artifactId>
       <version>4.29.3</version>
     </dependency>
-    <!-- smile commons -->
     <!-- jackson -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -85,15 +74,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.6.0</version>
-        <dependencies>
-          <dependency>
-            <groupId>${smile_commons.group}</groupId>
-            <artifactId>smile-commons</artifactId>
-            <version>${smile_commons.version}</version>
-          </dependency>
-        </dependencies>
         <configuration>
-          <configLocation>checkstyle.xml</configLocation>
+          <configLocation>src/main/resources/checkstyle.xml</configLocation>
           <encoding>UTF-8</encoding>
           <consoleOutput>true</consoleOutput>
           <failsOnError>true</failsOnError>
