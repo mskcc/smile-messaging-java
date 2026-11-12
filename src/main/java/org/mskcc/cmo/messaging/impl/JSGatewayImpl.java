@@ -191,8 +191,13 @@ public class JSGatewayImpl implements Gateway {
         if (!isConnected()) {
             throw new IllegalStateException("Gateway connection has not been established");
         }
-        exec.shutdownNow();
+        // stop accepting new publish requests, then let the publisher thread drain
+        // the queue and exit on its own (it polls every 100ms and stops once
+        // shutdownInitiated is set and the queue is empty). shutdownNow() is not
+        // used because interrupting the publisher while it is waiting on a
+        // JetStream publish ack aborts that publish and the message is dropped.
         shutdownInitiated = Boolean.TRUE;
+        exec.shutdown();
         publishingShutdownLatch.await();
         natsConnection.close();
     }
